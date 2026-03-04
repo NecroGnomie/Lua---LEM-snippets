@@ -1,0 +1,25 @@
+-- Forage LEM script, depends on MQ2Cursor to sort.
+local mq = require('mq')
+
+-- Do not edit this if condition
+if not package.loaded['events'] then
+    print('This script is intended to be imported to Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
+end
+
+local function condition()
+    return  mq.TLO.Me.Skill('Forage')() > 0 and mq.TLO.Me.Standing() and mq.TLO.Me.FreeInventory() >= 5 and mq.TLO.Me.AbilityReady('Forage')() and mq.TLO.Me.Casting() == nil and not mq.TLO.Me.Combat()
+end
+
+local function action()
+	if mq.TLO.Me.FreeInventory() <= 5 then
+        print('\agForage \arYou are just about out of room to forage')
+        end
+    if mq.TLO.Cursor.ID() ~= nil then
+            print('\agCursor Keep: \ap '..mq.TLO.Cursor.Name())
+            mq.cmd.autoinventory()
+        end
+    mq.cmd.doability('Forage')
+    mq.delay('1s')
+end
+
+return {onload=on_load, condfunc=condition, actionfunc=action}
