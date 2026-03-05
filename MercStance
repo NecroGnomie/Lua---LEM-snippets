@@ -23,9 +23,9 @@ local function action()
 		mq.cmd('/stance Balanced')
         mq.delay('1s')
 		end
-	if mq.TLO.Mercenary.Stance() ~= "Balanced" and mq.TLO.Me.XTarget() > 0 then
+	if (mq.TLO.Mercenary.Stance() ~= "Balanced" and mq.TLO.Me.XTarget() > 1 and mq.TLO.Me.GroupAssistTarget ~= "null") then
 		if mq.TLO.Mercenary.Class.Name() == "Rogue" or mq.TLO.Mercenary.Class.Name() == "Wizard" then
-			if mq.TLO.Me.GroupAssistTarget.PctHPs() >= 91 or mq.TLO.Group.Member(mq.TLO.Me.Mercenary.CleanName()).PctAggro() >= 86 then
+			if (mq.TLO.Me.GroupAssistTarget.PctHPs() >= 91) or (mq.TLO.Group.Member(mq.TLO.Me.Mercenary.CleanName()).PctAggro() >= 86) then
 --				print ('Merc Stance \ay Balanced Stage 2')
 				mq.cmd('/stance Balanced')
 				mq.delay('1s')
