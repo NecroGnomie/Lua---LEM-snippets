@@ -1,0 +1,60 @@
+-- Mercenary Stance script:
+-- Simple script to control mercs.
+-- If the target a named, or you have more than 3 thing on Xtarget, will put cleric mercs into reactive stance.
+-- If the target is below 90% HPs, and merc is below 85% aggro, puts DPS mercs into burn stance.
+-- If merc aggro goes over 85%, or not in combat, changes DPS mercs and cleric mercs to balanced stance.
+-- Does not alter Warrior mercs.
+-- Revives dead mercs.
+
+local mq = require('mq')
+
+-- Do not edit this if condition
+if not package.loaded['events'] then
+    print('This script is intended to be imported to Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
+end
+
+local function condition()
+    return  mq.TLO.Mercenary.State() == "ACTIVE"
+end
+
+local function action()
+	if mq.TLO.Me.XTarget() == 0 and mq.TLO.Mercenary.Stance() ~= "Balanced" then 
+--		print ('Merc Stance \ay Balanced stage 1')
+		mq.cmd('/stance Balanced')
+        mq.delay('1s')
+		end
+	if mq.TLO.Mercenary.Stance() ~= "Balanced" and mq.TLO.Me.XTarget() > 0 then
+		if mq.TLO.Mercenary.Class.Name() == "Rogue" or mq.TLO.Mercenary.Class.Name() == "Wizard" then
+			if mq.TLO.Me.GroupAssistTarget.PctHPs() >= 91 or mq.TLO.Group.Member(mq.TLO.Me.Mercenary.CleanName()).PctAggro() >= 86 then
+--				print ('Merc Stance \ay Balanced Stage 2')
+				mq.cmd('/stance Balanced')
+				mq.delay('1s')
+				end
+			end
+		end
+	if mq.TLO.Me.GroupAssistTarget.Type() ~= PC and mq.TLO.Me.GroupAssistTarget.PctHPs() <=90 then
+--		print ('Burn check 1')
+		if mq.TLO.Mercenary.Class.Name() == "Cleric" then
+			if  mq.TLO.Mercenary.Stance() ~= "Reactive" and mq.TLO.Target.Named or mq.TLO.Me.XTarget() >=3 then
+--				print ('Cleric Reactive')
+				mq.cmd('/stance reactive')
+				mq.delay('1s')
+				end
+			end
+		if  mq.TLO.Mercenary.Class.Name() == "Rogue" or mq.TLO.Mercenary.Class.Name() == "Wizard" then
+--			print ('Burn check 2')
+			if mq.TLO.Mercenary.Stance() ~= "Burn" and mq.TLO.Group.Member(mq.TLO.Me.Mercenary.CleanName()).PctAggro() <= 85 then
+--				print ('Burning')
+				mq.cmd('/stance Burn')
+				mq.delay('1s')
+				end
+			end
+	if mq.TLO.Window[MMGW_ManageWnd].Child[MMGW_SuspendButton].Enabled() and mq.TLO.Mercenary.State() == "DEAD" then
+		mq.cmd ('/notify MMGW_ManageWnd MMGW_SuspendButton LeftMouseUp')
+		mq.delay ('10s', mq.TLO.Mercenary.State() == "ACTIVE")
+		end
+	end
+	mq.delay('1s')
+end
+
+return {onload=on_load, condfunc=condition, actionfunc=action}
