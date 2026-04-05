@@ -1,4 +1,5 @@
--- Picks up glowing globes if your toon gets with in 20' of onw
+-- Picks up glowing globes if your toon gets with in 20' of one
+-- NecroGnomie
 local mq = require('mq')
 
 -- Do not edit this if condition
