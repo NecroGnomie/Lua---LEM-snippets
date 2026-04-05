@@ -1,4 +1,4 @@
--- LEM sniuppet to cast the Eradicate Magic AA as needed.
+-- LEM snippet to cast the Eradicate Magic AA as needed.
 -- NecroGnomie
 local mq = require('mq')
 
