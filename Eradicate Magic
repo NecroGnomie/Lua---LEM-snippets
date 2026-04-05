@@ -1,0 +1,39 @@
+-- LEM sniuppet to cast the Eradicate Magic AA as needed.
+-- NecroGnomie
+local mq = require('mq')
+
+-- Do not edit this if condition
+if not package.loaded['events'] then
+    print('This script is intended to be imported to Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
+end
+
+local function on_load()
+    -- Perform any initial setup here when the event is loaded.
+end
+
+---@return boolean @Returns true if the action should fire, otherwise false.
+local function condition()
+    -- 1. Check if XTarget count is 2 or less
+    -- 2. Check if Target has a Damage Shield or Beneficial buff
+    -- 3. Check if Eradicate Magic is ready
+    -- 4. Check we are targeting an NPC
+    -- 5. Check the target is the Group Assist's Target
+    -- 6. Check target is in the line of sight
+    -- 7. Ensure we are NOT currently casting anything else
+    -- 8. Check we are not invisible
+    return mq.TLO.Me.XTarget() <= 2 
+        and mq.TLO.Target.DSed() or mq.TLO.Target.Beneficial()
+        and mq.TLO.Cast.Ready('Eradicate Magic')() 
+        and mq.TLO.Target.Type() == NPC
+        and mq.TLO.Target.ID() == mq/TLO/Me.GroupAssistTarget.ID()
+        and mq.TLO.Target.LineOfSight()
+        and not mq.TLO.Me.Casting()
+        and not mq.TLO.Me.Invis()
+end 
+
+local function action()
+    -- Implement the action to perform here.
+     mq.cmdf('/casting "Eradicate Magic" alt')
+end
+
+return {onload=on_load, condfunc=condition, actionfunc=action}
