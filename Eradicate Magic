@@ -1,39 +1,58 @@
--- LEM snippet to cast the Eradicate Magic AA as needed.
--- NecroGnomie
+-- Lua LEM script to use Eradicate Magic AA on damage shield and beneficial buffs.
+
 local mq = require('mq')
 
--- Do not edit this if condition
+-- Check if LEM is actually the one loading this
 if not package.loaded['events'] then
     print('This script is intended to be imported to Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
 end
 
 local function on_load()
-    -- Perform any initial setup here when the event is loaded.
+    -- Perform initial setup here
 end
 
 ---@return boolean @Returns true if the action should fire, otherwise false.
-local function condition()
-    -- 1. Check if XTarget count is 2 or less
-    -- 2. Check if Target has a Damage Shield or Beneficial buff
-    -- 3. Check if Eradicate Magic is ready
-    -- 4. Check we are targeting an NPC
-    -- 5. Check the target is the Group Assist's Target
-    -- 6. Check target is in the line of sight
-    -- 7. Ensure we are NOT currently casting anything else
-    -- 8. Check we are not invisible
-    return mq.TLO.Me.XTarget() <= 2 
-        and mq.TLO.Target.DSed() or mq.TLO.Target.Beneficial()
-        and mq.TLO.Cast.Ready('Eradicate Magic')() 
-        and mq.TLO.Target.Type() == NPC
-        and mq.TLO.Target.ID() == mq/TLO/Me.GroupAssistTarget.ID()
-        and mq.TLO.Target.LineOfSight()
-        and not mq.TLO.Me.Casting()
-        and not mq.TLO.Me.Invis()
-end 
+local function should_cast_eradicate()
+    -- 1. Check basic states first
+    if mq.TLO.Me.Invis() or mq.TLO.Me.Casting() then return false end
+    
+    local xtCount = mq.TLO.Me.XTarget() or 0
+    if xtCount > 2 then return false end
 
-local function action()
-    -- Implement the action to perform here.
-     mq.cmdf('/casting "Eradicate Magic" alt')
+    -- 2. Validate Target
+    local target = mq.TLO.Target
+    if not target() or target.Type() ~= "NPC" then return false end
+    
+    -- 3. Check HP threshold and Distance
+    if (target.PctHPs() or 0) <= 95 or (target.Distance3D() or 100) >= 50 then return false end
+    if not target.LineOfSight() then return false end
+
+    -- 4. Check Group Assist
+    local assistID = mq.TLO.Me.GroupAssistTarget.ID() or 0
+    if target.ID() ~= assistID then return false end
+
+    -- 5. Spell specific checks
+    if not mq.TLO.Cast.Ready('Eradicate Magic')() then return false end
+    if not (target.DSed() or target.Beneficial()) then return false end
+
+    -- 6. Check we are in combat
+    if  mq.TLO.Me.CombatState() ~= "COMBAT" then return false end
+
 end
 
-return {onload=on_load, condfunc=condition, actionfunc=action}
+local function action()
+    -- We use mq.cmd instead of mq.cmdf if we don't need string formatting, 
+    -- but your targetid logic is good. 
+    if  mq.TLO.Me.CombatState() ~= "COMBAT" then
+        return
+    end
+    mq.cmdf('/casting "Eradicate Magic" alt -targetid|%d', mq.TLO.Me.GroupAssistTarget.ID())
+end
+
+-- CRITICAL: Return the functions to LEM. 
+-- Note: I changed 'condfunc=condition' to 'condfunc=should_cast_eradicate' to match your function name.
+return {
+    onload = on_load, 
+    condfunc = should_cast_eradicate, 
+    actionfunc = action
+}
