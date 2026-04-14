@@ -1,25 +1,54 @@
--- Forage LEM script, depends on MQ2Cursor to sort.
+-- Lua LEM script to automate forage V1.0
+
 local mq = require('mq')
 
--- Do not edit this if condition
+-- Check if LEM is actually the one loading this
 if not package.loaded['events'] then
-    print('This script is intended to be imported to Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
+    print('\ar[Forage]\ax This script is intended for Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
 end
 
+local function on_load()
+    print('\ag[Forage]\ax LEM Module Loaded. Monitoring windows for safety.')
+end
+
+---@return boolean @Returns true if we are ready to forage or need to clear the cursor
 local function condition()
-    return  mq.TLO.Me.Skill('Forage')() > 0 and mq.TLO.Me.Standing() and mq.TLO.Me.FreeInventory() >= 5 and mq.TLO.Me.AbilityReady('Forage')() and mq.TLO.Me.Casting() == nil and not mq.TLO.Me.Combat()
+    -- 1. Basic State Checks
+    if (mq.TLO.Me.Skill('Forage')() or 0) <= 0 then return false end
+    if not mq.TLO.Me.Standing() or mq.TLO.Me.Combat() or mq.TLO.Me.Casting() then return false end
+    if (mq.TLO.Me.FreeInventory() or 0) < 5 then return false end
+
+    -- 2. Safety Windows Check (Pause if any of these are open)
+    -- Added: Inventory, Merchant, Bank, Spellbook, and Trade
+    if mq.TLO.Window('InventoryWindow').Open() or 
+       mq.TLO.Window('MerchantWnd').Open() or 
+       mq.TLO.Window('BigBankWnd').Open() or 
+       mq.TLO.Window('SpellBookWnd').Open() or 
+       mq.TLO.Window('TradeWnd').Open() then 
+        return false 
+    end
+
+    -- 3. Logic: Trigger if we have something on cursor OR if Forage is ready
+    return mq.TLO.Cursor.ID() ~= nil or mq.TLO.Me.AbilityReady('Forage')()
 end
 
 local function action()
-	if mq.TLO.Me.FreeInventory() <= 5 then
-        print('\agForage \arYou are just about out of room to forage')
-        end
-    if mq.TLO.Cursor.ID() ~= nil then
-            print('\agCursor Keep: \ap '..mq.TLO.Cursor.Name())
-            mq.cmd.autoinventory()
-        end
-    mq.cmd.doability('Forage')
-    mq.delay('1s')
+    -- Priority 1: Handle Cursor
+    if mq.TLO.Cursor.ID() then
+        -- Even though we check in the condition, we double-check here for safety
+        mq.cmd('/autoinventory')
+        return 
+    end
+
+    -- Priority 2: Use Forage
+    if mq.TLO.Me.AbilityReady('Forage')() then
+        mq.cmd('/doability Forage')
+        mq.delay(100) 
+    end
 end
 
-return {onload=on_load, condfunc=condition, actionfunc=action}
+return {
+    onload = on_load, 
+    condfunc = condition, 
+    actionfunc = action
+}
