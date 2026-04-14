@@ -10,51 +10,101 @@ local mq = require('mq')
 
 -- Do not edit this if condition
 if not package.loaded['events'] then
-    print('This script is intended to be imported to Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
+    print('\ar[MercControl]\ax This script is intended for Lua Event Manager (LEM). Try "\a-t/lua run lem\a-x"')
 end
 
+local function on_load()
+    print('\ag[MercControl]\ax Module Loaded.')
+end
+
+---@return boolean @Returns true if we have a merc (Active or Dead)
 local function condition()
-    return  mq.TLO.Mercenary.State() == "ACTIVE"
+    local state = mq.TLO.Mercenary.State()
+    return state == "ACTIVE" or state == "DEAD"
 end
 
 local function action()
-	if mq.TLO.Me.XTarget() == 0 and mq.TLO.Mercenary.Stance() ~= "Balanced" then 
---		print ('Merc Stance \ay Balanced stage 1')
-		mq.cmd('/stance Balanced')
-        mq.delay('1s')
-		end
-	if (mq.TLO.Mercenary.Stance() ~= "Balanced" and mq.TLO.Me.XTarget() > 1 and mq.TLO.Me.GroupAssistTarget ~= "null") then
-		if mq.TLO.Mercenary.Class.Name() == "Rogue" or mq.TLO.Mercenary.Class.Name() == "Wizard" then
-			if (mq.TLO.Me.GroupAssistTarget.PctHPs() >= 91) or (mq.TLO.Group.Member(mq.TLO.Me.Mercenary.CleanName()).PctAggro() >= 86) then
---				print ('Merc Stance \ay Balanced Stage 2')
-				mq.cmd('/stance Balanced')
-				mq.delay('1s')
-				end
-			end
-		end
-	if mq.TLO.Me.GroupAssistTarget.Type() ~= PC and mq.TLO.Me.GroupAssistTarget.PctHPs() <=90 then
---		print ('Burn check 1')
-		if mq.TLO.Mercenary.Class.Name() == "Cleric" then
-			if  mq.TLO.Mercenary.Stance() ~= "Reactive" and mq.TLO.Target.Named or mq.TLO.Me.XTarget() >=3 then
---				print ('Cleric Reactive')
-				mq.cmd('/stance reactive')
-				mq.delay('1s')
-				end
-			end
-		if  mq.TLO.Mercenary.Class.Name() == "Rogue" or mq.TLO.Mercenary.Class.Name() == "Wizard" then
---			print ('Burn check 2')
-			if mq.TLO.Mercenary.Stance() ~= "Burn" and mq.TLO.Group.Member(mq.TLO.Me.Mercenary.CleanName()).PctAggro() <= 85 then
---				print ('Burning')
-				mq.cmd('/stance Burn')
-				mq.delay('1s')
-				end
-			end
-	if mq.TLO.Window[MMGW_ManageWnd].Child[MMGW_SuspendButton].Enabled() and mq.TLO.Mercenary.State() == "DEAD" then
-		mq.cmd ('/notify MMGW_ManageWnd MMGW_SuspendButton LeftMouseUp')
-		mq.delay ('10s', mq.TLO.Mercenary.State() == "ACTIVE")
-		end
-	end
-	mq.delay('1s')
+    local merc = mq.TLO.Mercenary
+    local me = mq.TLO.Me
+    local assist = me.GroupAssistTarget
+    local xtCount = me.XTarget() or 0
+
+    -- 1. REVIVE DEAD MERC
+    if merc.State() == "DEAD" then
+        if mq.TLO.Window('MMGW_ManageWnd').Child('MMGW_SuspendButton').Enabled() then
+            print('\ar[MercControl]\ax Mercenary is dead. Attempting to revive...')
+            mq.cmd('/notify MMGW_ManageWnd MMGW_SuspendButton LeftMouseUp')
+            mq.delay(5000, function() return merc.State() == "ACTIVE" end)
+        end
+        return -- Exit action to let the merc spawn in
+    end
+
+    if mq.TLO.Target() and mq.TLO.Target.Type() == 'CORPSE' then
+        return 
+    end
+
+    local currentStance = merc.Stance()
+    local mercClass = merc.Class.Name()
+
+    -- 2. RESET TO BALANCED (Not in combat or low threat)
+    if  mq.TLO.Me.CombatState() ~= "COMBAT" and currentStance ~= "Balanced" and mercClass ~= "Warrior" then
+        mq.cmd('/stance Balanced')
+        mq.delay(500)
+        return
+    end
+
+    -- 3. COMBAT LOGIC (Requires a valid assist target)
+    if assist.ID() ~= 0 and assist.Type() ~= "PC" and mq.TLO.Me.CombatState() == "COMBAT" then
+        local targetHP = assist.PctHPs() or 100
+        local mercName = merc.CleanName()
+        local mercAggro = 0
+        
+         if mercClass == "Warrior" then
+            return
+         end
+        
+        if mq.TLO.Me.CombatState() ~= "COMBAT" then
+            return
+        end
+        -- Get Merc Aggro safely
+        if mercName then
+            mercAggro = mq.TLO.Group.Member(mercName).PctAggro() or 0
+        end
+
+        -- CLERIC LOGIC
+        if mercClass == "Cleric" then
+            -- Set Reactive if Named or 3+ mobs
+            if currentStance ~= "Reactive" and (mq.TLO.Target.Named() or xtCount >= 3) then
+                mq.cmd('/stance Reactive')
+                mq.delay(200)
+            -- Back to Balanced if things are calm
+            elseif currentStance == "Reactive" and not mq.TLO.Target.Named() and xtCount < 3 then
+                mq.cmd('/stance Balanced')
+                mq.delay(200)
+            end
+        end
+
+        -- DPS LOGIC (Rogue/Wizard)
+        if mercClass == "Rogue" or mercClass == "Wizard" then
+            -- Set Burn if target < 90% and aggro is safe
+            if targetHP <= 90 and mercAggro <= 75 then
+                if currentStance ~= "Burn" then
+                    mq.cmd('/stance Burn')
+                    mq.delay(200)
+                end
+            -- Throttle back to Balanced if aggro high or target HP high
+            elseif mercAggro > 75 or targetHP > 90 then
+                if currentStance ~= "Balanced" then
+                    mq.cmd('/stance Balanced')
+                    mq.delay(200)
+                end
+            end
+        end
+    end
 end
 
-return {onload=on_load, condfunc=condition, actionfunc=action}
+return {
+    onload = on_load, 
+    condfunc = condition, 
+    actionfunc = action
+}
