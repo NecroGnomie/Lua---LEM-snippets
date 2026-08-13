@@ -1,5 +1,4 @@
 -- Lua LEM script to automate forage V1.0
-
 local mq = require('mq')
 
 -- Check if LEM is actually the one loading this
@@ -11,7 +10,7 @@ local function on_load()
     print('\ag[Forage]\ax LEM Module Loaded. Monitoring windows for safety.')
 end
 
----@return boolean @Returns true if we are ready to forage or need to clear the cursor
+---@return boolean @Returns true if we are ready to forage
 local function condition()
     -- 1. Basic State Checks
     if (mq.TLO.Me.Skill('Forage')() or 0) <= 0 then return false end
@@ -28,27 +27,16 @@ local function condition()
         return false 
     end
 
-    -- 3. Logic: Trigger if we have something on cursor OR if Forage is ready
-    return mq.TLO.Cursor.ID() ~= nil or mq.TLO.Me.AbilityReady('Forage')()
+    -- 3. Logic: Trigger only if Forage is ready
+    return mq.TLO.Me.AbilityReady('Forage')()
 end
 
 local function action()
-    -- Priority 1: Handle Cursor
-    if mq.TLO.Cursor.ID() then
-        -- Even though we check in the condition, we double-check here for safety
-        mq.cmd('/autoinventory')
-        return 
-    end
-
-    -- Priority 2: Use Forage
+    -- Priority: Use Forage
     if mq.TLO.Me.AbilityReady('Forage')() then
         mq.cmd('/doability Forage')
-        mq.delay(100) 
+        mq.delay(100)
     end
 end
 
-return {
-    onload = on_load, 
-    condfunc = condition, 
-    actionfunc = action
-}
+return { onload = on_load, condfunc = condition, actionfunc = action }
