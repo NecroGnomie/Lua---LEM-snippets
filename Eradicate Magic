@@ -32,7 +32,7 @@ local function should_cast_eradicate()
     if target.ID() ~= assistID then return false end
 
     -- 5. Spell specific checks
-    if not mq.TLO.Cast.Ready('Eradicate Magic')() then return false end
+    if not mq.TLO.Me.AltAbilityReady('Eradicate Magic')() then return false end
     if not (target.DSed() or target.Beneficial()) then return false end
 
     -- 6. Check we are in combat
