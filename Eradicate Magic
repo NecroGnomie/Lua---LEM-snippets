@@ -1,5 +1,4 @@
 -- Lua LEM script to use Eradicate Magic AA on damage shield and beneficial buffs.
-
 local mq = require('mq')
 
 -- Check if LEM is actually the one loading this
@@ -16,43 +15,41 @@ local function should_cast_eradicate()
     -- 1. Check basic states first
     if mq.TLO.Me.Invis() or mq.TLO.Me.Casting() then return false end
     
-    local xtCount = mq.TLO.Me.XTarget() or 0
-    if xtCount > 2 then return false end
-
     -- 2. Validate Target
     local target = mq.TLO.Target
     if not target() or target.Type() ~= "NPC" then return false end
     
-    -- 3. Check HP threshold and Distance
-    if (target.PctHPs() or 0) <= 95 or (target.Distance3D() or 100) >= 50 then return false end
+    -- 3. Check HP threshold (Fires only if mob is UNDER 98% health) and Distance
+    if (target.PctHPs() or 0) >= 98 or (target.Distance3D() or 100) >= 50 then return false end
     if not target.LineOfSight() then return false end
-
+    
     -- 4. Check Group Assist
     local assistID = mq.TLO.Me.GroupAssistTarget.ID() or 0
     if target.ID() ~= assistID then return false end
-
+    
     -- 5. Spell specific checks
     if not mq.TLO.Me.AltAbilityReady('Eradicate Magic')() then return false end
     if not (target.DSed() or target.Beneficial()) then return false end
-
+    
     -- 6. Check we are in combat
-    if  mq.TLO.Me.CombatState() ~= "COMBAT" then return false end
+    if mq.TLO.Me.CombatState() ~= "COMBAT" then return false end
 
+    -- FIX: If it survives all checks above, we MUST return true to activate!
+    return true
 end
 
 local function action()
-    -- We use mq.cmd instead of mq.cmdf if we don't need string formatting, 
-    -- but your targetid logic is good. 
-    if  mq.TLO.Me.CombatState() ~= "COMBAT" then
-        return
+    if mq.TLO.Me.CombatState() ~= "COMBAT" then return end
+    if mq.TLO.Me.AltAbilityReady('Eradicate Magic')() then
+        print('\ag[LEM]\ax Casting \apEradicate Magic\ax on \ar'..mq.TLO.Target.CleanName())
+        mq.cmd('/alt activate 547')
+        mq.delay(100)
     end
-    mq.cmdf('/casting "Eradicate Magic" alt -targetid|%d', mq.TLO.Me.GroupAssistTarget.ID())
 end
 
--- CRITICAL: Return the functions to LEM. 
--- Note: I changed 'condfunc=condition' to 'condfunc=should_cast_eradicate' to match your function name.
+-- Return the functions to LEM.
 return {
-    onload = on_load, 
-    condfunc = should_cast_eradicate, 
+    onload = on_load,
+    condfunc = should_cast_eradicate,
     actionfunc = action
 }
